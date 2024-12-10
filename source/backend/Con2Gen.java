@@ -1,10 +1,9 @@
 package backend;
 
-import objects.SectionMarker;
+import objects.TemplateIndexMap;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.HashMap;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -46,6 +45,10 @@ public class Con2Gen {
                 System.out.println("Generating template (TODO: implement this)");
                 generateTemplates();
                 break;
+            case "update-template":
+                System.out.println("Update template (TODO: implement this AFTER 'template', 'page', and 'page-dir')");
+                generateTemplates();
+                break;
             case "page":
                 System.out.println("Generating single page (TODO: implement this");
                 break;
@@ -62,92 +65,17 @@ public class Con2Gen {
         System.out.println("Importing Template: " + templatePath);
     }
 
-     /*
-     TODO: verify that the formats of "#SECTION.", "#VARIABLE.", "#SCRIPT.", and "#IMAGE." aren't used by major tools
-     TODO: Add ability to have optional WRAPPED sections
-        These "optional wrapped sections" should only generate if there is content for them
-         Ex: If no nutrition info is provided, no nutrition info section should be added
-         Ex2: A section for "More Images" should only generate if there are more images
-             Any HTML/CSS related to it should not appear if there's no content
-             Title "More Images", the image files, and any border/grid should only be created if there's content
-             If the "More Images" content file is blank, don't generate ANY adjacent web code
-         This can probably be done via a new flag + brackets
-         Sections that aren't optional don't need this extra overhead
-     Question: Should ALL sections be bracketed?
-         That would make things consistent, but it feels unneeded in a lot of cases
-             It seems better if EVERY section behaves like an optional section
-         Adding ANY bracketed sections would make nesting a potential problem
-             If I have to deal with nesting at all, it might be worth just actually dealing with it
-             Option 1: Make ANY nesting fail
-                 I think this is a good option at first
-             Option 2: Allow ALL nesting
-                 Generate any portions that are nested even if the things above them are not
-             Option 3: Allow nesting ONLY when all layers are complete
-                 If every section in a nest has content, then generate the full nest
-     Solution:
-         All three options can eventually be supported through configurations
-         For the first approach, no nested brackets will be supported
-             Other cases can be added later on if the need arises
-
-    Section formatting should be done outside of the template page
-        In the template page, sections/variables/etc should be simple
-            Any additional formatting should be done elsewhere
-            If a section requires <ol> and <li>, they should be set in separate file
-
-    */
     private void generateTemplates() {
         System.out.println("Generating Templates from marked up page");
 
         System.out.println("Absolute path to a file to extract/make into a template:");
-
-        String sectionRegex = "#SECTION.(.[a-zA-Z0-9_]*)(\\(\\))";
-        String variableRegex = "#VARIABLE.(.[a-zA-Z0-9_]*)(\\(\\))";
-        String scriptRegex = "#SCRIPT.(.[a-zA-Z0-9_]*)(\\(\\))";
-        String imageRegex = "#IMAGE.(.[a-zA-Z0-9_]*)(\\(\\))";
-
-        // TODO: Replace this with CLI input
         String filePath = userTextInput.nextLine();
-        Pattern sectionPattern = Pattern.compile(sectionRegex);
-        HashMap<String, Integer> templateSectionLines = new HashMap<>();
 
-        try {
-            File fileToTemplate = new File(filePath);
-            Scanner fileToTemplateReader = new Scanner(fileToTemplate);
-            String currentLine = "";
+        // TODO: Refactor the regex code into a regexTemplateObject (change name)
+        TemplateIndexMap templateIndexMap = new TemplateIndexMap();
+        TemplateGenerationProcessor templateGenerationProcessor = new TemplateGenerationProcessor(templateIndexMap);
 
-            // Currently this just reads the file. Add logic for creating template
-            // This logic should make a list of all marked sections and variables
-            //      #SECTION.section_name()
-            //      #VARIABLE.variable_name()
-            //      #SCRIPT.script_name()
-            while (fileToTemplateReader.hasNextLine()) {
-                currentLine = fileToTemplateReader.nextLine();
-
-                // TODO: Extract this logic into a separate function
-                // Temporary regex for #SECTION.sectionName(): "(#SECTION.(.[a-zA-Z0-9_]*)(\(\)))"
-                // Use contains() first to check for any matches, as it's significantly faster
-                // Further processing can be done using regex to extract section names
-                // TODO: See if this is even worth it. I think doing this should save processing power
-                // There's a bit more duplication of searching for #SECTION., but it's still likely faster
-                if (currentLine.contains("#SECTION.")) {
-                    Matcher matcher = sectionPattern.matcher(currentLine);
-                    // Look for instances of #SECTION.section_name()
-                    // Add instances to a Map of Lists of line numbers
-                        // Ex: variables['recipe_name'] = [46, 93, 102] // the lines #VARIABLE.recipe_name() appears on
-//                    matcher.
-                    // TODO: Add code to get all valid sections and extract section names + line numbers
-                    System.out.println("(light) Match found: " + currentLine);
-                }
-//                System.out.println(currentLine);
-            }
-            fileToTemplateReader.close();
-        }
-        catch (FileNotFoundException exception) {
-            System.out.println("Invalid file path: " + filePath);
-            return;
-        }
-
-
+        templateGenerationProcessor.processFile(filePath);
 
         // TODO: should I mock out this whole thing, or just hard code print a template?
         // For V1: User inputs a path to the template file
@@ -201,3 +129,38 @@ public class Con2Gen {
 //
 //        // Save/rename/move/finish processing output file
 //        System.out.println("Completing processing for content file");
+
+
+/*
+    Notes for "Nesting"
+    TODO: verify that the formats of "#SECTION.", "#VARIABLE.", "#SCRIPT.", and "#IMAGE." aren't used by major tools
+    TODO: Add ability to have optional WRAPPED sections
+       These "optional wrapped sections" should only generate if there is content for them
+        Ex: If no nutrition info is provided, no nutrition info section should be added
+        Ex2: A section for "More Images" should only generate if there are more images
+            Any HTML/CSS related to it should not appear if there's no content
+            Title "More Images", the image files, and any border/grid should only be created if there's content
+            If the "More Images" content file is blank, don't generate ANY adjacent web code
+        This can probably be done via a new flag + brackets
+        Sections that aren't optional don't need this extra overhead
+    Question: Should ALL sections be bracketed?
+        That would make things consistent, but it feels unneeded in a lot of cases
+            It seems better if EVERY section behaves like an optional section
+        Adding ANY bracketed sections would make nesting a potential problem
+            If I have to deal with nesting at all, it might be worth just actually dealing with it
+            Option 1: Make ANY nesting fail
+                I think this is a good option at first
+            Option 2: Allow ALL nesting
+                Generate any portions that are nested even if the things above them are not
+            Option 3: Allow nesting ONLY when all layers are complete
+                If every section in a nest has content, then generate the full nest
+    Solution:
+        All three options can eventually be supported through configurations
+        For the first approach, no nested brackets will be supported
+            Other cases can be added later on if the need arises
+
+   Section formatting should be done outside of the template page
+       In the template page, sections/variables/etc should be simple
+           Any additional formatting should be done elsewhere
+           If a section requires <ol> and <li>, they should be set in separate file
+*/

@@ -33,3 +33,20 @@ public class SectionMarker {
     public int getEndLine() {return sectionEndLine;}
     public String getSectionName() {return sectionName;}
 }
+
+
+// This file is basically just a dump for unneeded code at this point:
+// TODO: Remove this after protoype is working
+/*
+    String sectionRegex = "#SECTION.(.[a-zA-Z0-9_]*)(\\(\\))";
+    String variableRegex = "#VARIABLE.(.[a-zA-Z0-9_]*)(\\(\\))";
+    String scriptRegex = "#SCRIPT.(.[a-zA-Z0-9_]*)(\\(\\))";
+    String imageRegex = "#IMAGE.(.[a-zA-Z0-9_]*)(\\(\\))";
+    String genericTemplateRegex = "#([A-Z0-9]*)\\.(.[a-zA-Z0-9_]*)(\\(\\))";
+*/
+
+// TODO: Clean up this comment block after implementation of it
+// Look for instances of #SECTION.section_name()
+// Add instances to a Map of Lists of line numbers
+// Ex: variables['recipe_name'] = [46, 93, 102] // the lines #VARIABLE.recipe_name() appears on
+//                    matcher.
