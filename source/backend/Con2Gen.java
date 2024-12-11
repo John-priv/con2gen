@@ -1,12 +1,8 @@
 package backend;
 
-import objects.TemplateIndexMap;
+import objects.TemplateNameMap;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.util.Scanner;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 // TODO: Need to focus on just passing along mock data
 public class Con2Gen {
@@ -69,30 +65,17 @@ public class Con2Gen {
         System.out.println("Generating Templates from marked up page");
 
         System.out.println("Absolute path to a file to extract/make into a template:");
-        String filePath = userTextInput.nextLine();
+        String inputTemplateFile = userTextInput.nextLine();
 
-        // TODO: Refactor the regex code into a regexTemplateObject (change name)
-        TemplateIndexMap templateIndexMap = new TemplateIndexMap();
-        TemplateGenerationProcessor templateGenerationProcessor = new TemplateGenerationProcessor(templateIndexMap);
+        // TODO: Make this configurable based on either user input OR a config file/input command
+        // Add a CLI command that takes both the template file and output directory as inputs
+        // I'd use the "userTextInput" approach but I'm too lazy to copy/paste two things per execution
+        String outputDirectory = "templates/test_template/";
 
-        templateGenerationProcessor.processFile(filePath);
+        TemplateGenerationProcessor templateGenerationProcessor = new TemplateGenerationProcessor();
 
-        // TODO: should I mock out this whole thing, or just hard code print a template?
-        // For V1: User inputs a path to the template file
-        // This should open the template file and extract each line
-        // I think processing should be added here during the initial approach?
-        // I'd rather not mock this --> can do a really bad implementation instead
-
-//        HashMap<String, SectionMarker> sectionMap = new HashMap<String, SectionMarker>();
-
-        // TODO: Implement actual process
-        // Open marked up page
-
-        // Extract the formatting from the section
-
-        // Get all section names, start lines, and end lines (div that start with "generator_template_SECTION_NAME")
-
-        // Create a mock
+        templateGenerationProcessor.processFile(inputTemplateFile);
+        templateGenerationProcessor.generateTemplateOutputs(outputDirectory);
     }
 
     private void mockGenerateTemplate() {
@@ -163,4 +146,18 @@ public class Con2Gen {
        In the template page, sections/variables/etc should be simple
            Any additional formatting should be done elsewhere
            If a section requires <ol> and <li>, they should be set in separate file
+*/
+
+
+
+/*
+    Future Ideas:
+        - Hashing the template file
+            - Stored hashed template file to check if a template has been edited since the last "regenerate-all"
+        - Hashed markdown/content file
+            - Used to quickly check if any updates were made to a file to speed up a "generate-all" call
+        - "Smart-generate-all"
+            - Generates files that have different template or content hashes, if this is faster than regenerating all
+        - "Generate-all-force"
+            - Ignores hashes and forces all pages to fully regenerate. Only needed if smart generate is added
 */
