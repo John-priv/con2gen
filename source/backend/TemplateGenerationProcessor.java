@@ -1,11 +1,11 @@
 package backend;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import objects.TemplateExecutionOrder;
 import objects.TemplateNameMap;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -24,7 +24,10 @@ import java.util.regex.Pattern;
 public class TemplateGenerationProcessor {
     public TemplateNameMap templateNameMap = new TemplateNameMap();
     public ArrayList<TemplateExecutionOrder> executionOrder = new ArrayList<>();
+    public String TemplateMarkdownContent;
     Pattern templatePattern = getTemplateRegex();
+
+    private final String executionOrderFileName = "executionOrder.json";
 
     public TemplateGenerationProcessor() {
     }
@@ -50,55 +53,118 @@ public class TemplateGenerationProcessor {
         return linesToSkip + 1;
     }
 
-    public void processFile(String filePath) {
+    public void processFile(String filePath) throws FileNotFoundException {
+        File fileToTemplate = new File(filePath);
+        Scanner fileToTemplateReader = new Scanner(fileToTemplate);
+        int linesToSkip = 0;
+        String currentLine;
+
+        while (fileToTemplateReader.hasNextLine()) {
+            currentLine = fileToTemplateReader.nextLine();
+            linesToSkip = processLine(currentLine, linesToSkip);
+        }
+
+        fileToTemplateReader.close();
+
+        // TODO: Clean up printing or move it behind a config
+        templateNameMap.print();
+        for (TemplateExecutionOrder templateExecutionOrder : executionOrder) {
+            templateExecutionOrder.print();
+        }
+
+        generateContentMarkdownString();
+    }
+
+    private void generateContentMarkdownString() {
+        // TODO: Implement this function
+        /* Take the stored "templateNameMap" OR "executionOrder"
+            Generate a multi-line markdown string to become the "content.md" file
+            Figure out if the TemplateNameMap needs to be ordered, or if execution order can be used
+            Ideally the content.md file will either:
+                - Be grouped by type, in order (i.e. all variables first, then all sections)
+                OR
+                - Be in order, ignoring type (in whatever order they're in execution order, by first instance)
+                    - Note: repeating non-variable keywords is likely uncommon, so first instance is likely cleanest
+        */
+    }
+
+    private String validateDirectory(String targetDirectory) {
+        if (Files.isDirectory(Path.of(targetDirectory))) {
+            return targetDirectory;
+        }
+
+        boolean validDirectory = false;
+
+        while (!validDirectory) {
+            Path targetDirectoryPath = Path.of(targetDirectory);
+            System.out.println(targetDirectory + " is not an existing directory. Enter 'yes' create a directory");
+            Scanner userTextInput = new Scanner(System.in);
+            try {
+                if (userTextInput.nextLine().equalsIgnoreCase("yes")) {
+                    Files.createDirectories(targetDirectoryPath);
+                    System.out.println("Created directory " + targetDirectoryPath);
+                    validDirectory = true;
+                } else {
+                    System.out.println("Enter a directory to save the template files: ");
+                    targetDirectory = userTextInput.nextLine();
+                }
+            } catch (Exception ex) {
+                System.out.println("validateDirectory exception: " + ex);
+            }
+        }
+
+        return targetDirectory;
+    }
+
+    private void writeExecutionOrderToFile(String validatedDirectory) {
+        Path executionOrderFile = Paths.get(validatedDirectory, executionOrderFileName);
         try {
-            File fileToTemplate = new File(filePath);
-            Scanner fileToTemplateReader = new Scanner(fileToTemplate);
-            int linesToSkip = 0;
-            String currentLine;
-
-            while (fileToTemplateReader.hasNextLine()) {
-                currentLine = fileToTemplateReader.nextLine();
-                linesToSkip = processLine(currentLine, linesToSkip);
-            }
-
-            templateNameMap.print();
-            for (TemplateExecutionOrder templateExecutionOrder : executionOrder) {
-                templateExecutionOrder.print();
-            }
-
-            fileToTemplateReader.close();
-        } catch (FileNotFoundException exception) {
-            System.out.println("Invalid file path: " + filePath);
+            ObjectWriter objectWriter = new ObjectMapper().writer();
+            String executionString = objectWriter.writeValueAsString(executionOrder);
+            Files.writeString(executionOrderFile, executionString);
+        } catch (IOException e) {
+            System.out.println("Error in writeExecutionOrderToFile: " + e);
         }
     }
 
-    // Should this be here or somewhere else?
+    private void writeContentMarkdownToFile(String validatedDirectory) {
+        // TODO: Implement this function
+        // Note: This should not be using JSON
+        // content.md comes from templateNameMap --> Variables, Sections, Images, Scripts
+        // This function should ideally not overwrite existing files automatically -- it should ask or append instead
+        System.out.println("Generating content.md");
+    }
+
     // TODO: Refactor this when working on "update-templates", require templateNameMap and executionOrder as inputs
     // NOTE: This function is the "hard-add" version: it WILL overwrite existing files BY DESIGN
-    public void generateTemplateOutputs(String outputDirectory) {
-        try {
-            Files.createDirectories(Paths.get(outputDirectory));
-            System.out.println("Created directory " + outputDirectory);
-        } catch (IOException e) {
-            System.out.println("FilePath issue with " + outputDirectory + ": " + e);
-//            throw new RuntimeException(e); // TODO: Figure out if this should throw an exception
-        }
+    // Should this be here or somewhere else?
+    public void generateTemplateOutputs(String targetDirectory) {
+        String validatedDirectory = validateDirectory(targetDirectory);
 
-        // create execution.json
-
-        // create template.md
+        writeExecutionOrderToFile(validatedDirectory);
+        writeContentMarkdownToFile(validatedDirectory);
 
         // create template hash
         // TODO: Implement template hash creation + validation
-
-        // generate the output template.md, execution.json, and template hash files
-        // template.md comes from templateNameMap --> Variables, Sections, Images, Scripts
     }
 
     // TODO: Remove this if it's not needed (after "update-template" workflow)
-    public void generateTemplate(String templateFilePath, String outputDirectory) {
-        processFile(templateFilePath);
-        generateTemplateOutputs(outputDirectory);
+    // It may make sense to have "generateNewTemplate" and "updateExistingTemplate" functions to make calling simpler
+    public void generateNewTemplate(String templateFilePath, String outputDirectory) {
+        try {
+            processFile(templateFilePath);
+            generateTemplateOutputs(outputDirectory);
+        } catch (FileNotFoundException e) {
+            System.out.println("Invalid file: " + templateFilePath);
+        }
+    }
+
+    public void updateExistingTemplate(String templateFilePath, String outputDirectory) {
+        try {
+            processFile(templateFilePath);
+            System.out.println("TODO: Add code to update existing template at " + outputDirectory);
+        } catch (FileNotFoundException e) {
+            System.out.println("Invalid file: " + templateFilePath);
+        }
     }
 }
