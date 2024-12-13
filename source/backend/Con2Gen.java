@@ -73,9 +73,7 @@ public class Con2Gen {
         String outputDirectory = "templates/test_template/";
 
         TemplateGenerationProcessor templateGenerationProcessor = new TemplateGenerationProcessor();
-
-        templateGenerationProcessor.processFile(inputTemplateFile);
-        templateGenerationProcessor.generateTemplateOutputs(outputDirectory);
+        templateGenerationProcessor.generateNewTemplate(inputTemplateFile, outputDirectory);
     }
 
     private void mockGenerateTemplate() {
