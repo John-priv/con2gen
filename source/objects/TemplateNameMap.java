@@ -2,7 +2,10 @@ package objects;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+
+import objects.TemplateElementTypes;
 
 public class TemplateNameMap {
     public HashMap<String, Set<String>> templateMap = new HashMap<>();
@@ -14,45 +17,53 @@ public class TemplateNameMap {
     public Set<String> imageNames = new HashSet<>();
     public Set<String> scriptNames = new HashSet<>();
 
-    private final String SECTION = "SECTION";
-    private final String VARIABLE = "VARIABLE";
-    private final String IMAGE = "IMAGE";
-    private final String SCRIPT = "SCRIPT";
-
     public TemplateNameMap() {
-        templateMap.put(SECTION, sectionNames);
-        templateMap.put(VARIABLE, variableNames);
-        templateMap.put(IMAGE, imageNames);
-        templateMap.put(SCRIPT, scriptNames);
+        templateMap.put(TemplateElementTypes.SECTION, sectionNames);
+        templateMap.put(TemplateElementTypes.VARIABLE, variableNames);
+        templateMap.put(TemplateElementTypes.IMAGE, imageNames);
+        templateMap.put(TemplateElementTypes.SCRIPT, scriptNames);
     }
 
-    // TODO: Add an ordered list of tuples to store execution order
-        // This should allow processing the template file in one pass-through
-        // This should probably be done in a separate file (TemplateGenerationProcessor probably)
-
-    public void add(String keywordType, String keywordName) {
-        switch (keywordType) {
-            case SECTION:
-                indexMapAdd(keywordName, sectionNames);
+    public void add(String elementType, String elementName) {
+        // Note: This should be reformatted if it expands beyond ~5-10 elements
+        // TODO: Investigate if this can/should be simplified to a one-line function
+        switch (elementType) {
+            case TemplateElementTypes.SECTION:
+                indexMapAdd(elementName, sectionNames);
                 break;
-            case VARIABLE:
-                indexMapAdd(keywordName, variableNames);
+            case TemplateElementTypes.VARIABLE:
+                indexMapAdd(elementName, variableNames);
                 break;
-            case IMAGE:
-                indexMapAdd(keywordName, imageNames);
+            case TemplateElementTypes.IMAGE:
+                indexMapAdd(elementName, imageNames);
                 break;
-            case SCRIPT:
-                indexMapAdd(keywordName, scriptNames);
+            case TemplateElementTypes.SCRIPT:
+                indexMapAdd(elementName, scriptNames);
                 break;
             default:
-                System.out.println(keywordType + " is not a valid TemplateNameMap keywordType");
+                System.out.println(elementType + " is not a valid TemplateNameMap elementType");
                 break;
         }
     }
 
-    private void indexMapAdd(String key, Set<String> indexMap) {
-        indexMap.add(key);
+    public boolean contains(String elementType, String elementName) {
+        switch (elementType) {
+            case TemplateElementTypes.SECTION:
+                return indexMapContains(elementName, sectionNames);
+            case TemplateElementTypes.VARIABLE:
+                return indexMapContains(elementName, variableNames);
+            case TemplateElementTypes.IMAGE:
+                return indexMapContains(elementName, imageNames);
+            case TemplateElementTypes.SCRIPT:
+                return indexMapContains(elementName, scriptNames);
+            default:
+                System.out.println(elementType + " is not a valid TemplateNameMap elementType");
+        }
+        return false;
     }
+
+    private void indexMapAdd(String key, Set<String> indexMap) { indexMap.add(key); }
+    private boolean indexMapContains(String key, Set<String> indexMap) { return indexMap.contains(key); }
 
     public void print() {
         System.out.println("Template Map: " + templateMap);
@@ -60,5 +71,11 @@ public class TemplateNameMap {
         System.out.println("IMAGE: " + imageNames);
         System.out.println("VARIABLE: " + variableNames);
         System.out.println("SCRIPT: " + scriptNames);
+    }
+
+    public void clear() {
+        for (Map.Entry<String, Set<String>> entry: templateMap.entrySet()) {
+            entry.setValue(new HashSet<>());
+        }
     }
 }

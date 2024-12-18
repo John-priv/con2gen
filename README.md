@@ -99,5 +99,6 @@ TODO: ADD THIS
 ```
 
 
-
+### Misc Notes:
+- This document is out of date and needs to be updated post-prototype
 
