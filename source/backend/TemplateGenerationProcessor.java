@@ -2,6 +2,8 @@ package backend;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
+import constants.FilePathConstants;
+import constants.PageGenerationConstants;
 import objects.*;
 
 import java.io.*;
@@ -26,17 +28,14 @@ import java.util.regex.Pattern;
         - Can only operate on one template at a time while executionOrder is global
             - To fix this, create one TemplateGenerationProcessor per template
         - Reduce/remove the number of global variables/objects after the prototype is working
-        - Move "default" to a constants file
+        - Store validatedDirectory in a config file, then make it a private final String
+            - This should be accessible to everything instead of being passed through multiple functions
+            - One TemplateGenerationProcessor per template being generated
 */
 public class TemplateGenerationProcessor {
     public TemplateNameMap templateNameMap = new TemplateNameMap();
-    private ArrayList<TemplateExecutionOrder> executionOrder = new ArrayList<>();
+    private TemplateExecutionOrder executionOrder = new TemplateExecutionOrder();
     Pattern templatePattern = getTemplateRegex();
-
-    private final String CONFIG_DIRECTORY = "config";
-    private final String CONFIG_FILE = "configuration.json";
-    private final String CONTENT_MD_FILE = "content.md";
-    private final String EXECUTION_ORDER_MD = "executionOrder.json";
 
     private static final String LONG_LINE = "--------------------------------------------------";
 
@@ -49,7 +48,7 @@ public class TemplateGenerationProcessor {
     }
 
     private void processMatch(String keywordType, String variableName, int linesToSkip) {
-        executionOrder.add(new TemplateExecutionOrder(keywordType, variableName, linesToSkip));
+        executionOrder.add(new TemplateExecutionOrderItem(keywordType, variableName, linesToSkip));
     }
 
     public int processLine(String lineText, int linesToSkip) {
@@ -64,7 +63,7 @@ public class TemplateGenerationProcessor {
     }
 
     public void generateExecutionOrderFromFile(String filePath) throws FileNotFoundException {
-        executionOrder = new ArrayList<>();
+        executionOrder.clear();
         File fileToTemplate = new File(filePath);
         Scanner fileToTemplateReader = new Scanner(fileToTemplate);
         int linesToSkip = 0;
@@ -76,39 +75,31 @@ public class TemplateGenerationProcessor {
         }
 
         fileToTemplateReader.close();
-
-        // TODO: Clean up printing or move it behind a config
-        templateNameMap.print();
-        for (TemplateExecutionOrder templateExecutionOrder : executionOrder) {
-            templateExecutionOrder.print();
-        }
     }
 
-    private ArrayList<String> generateContentMarkdownLines() {
+    private ArrayList<String> generateContentMarkdownLines(String validatedDirectory) {
         ArrayList<String> contentMarkdownLines = new ArrayList<>();
-        TemplateElementList templateElementList = generateElementOrderList();
+        TemplateElementList templateElementList = generateElementOrderList(validatedDirectory);
         contentMarkdownLines.addAll(generateVariableLines(templateElementList.variableNames));
         contentMarkdownLines.addAll(generateSectionLines(templateElementList.sectionNames));
         generateContentMarkdownLinesImages();   // TODO: Implement this
         generateContentMarkdownLinesScripts();  // TODO: Implement this
-        templateElementList.print();
-        System.out.println("contentMarkdownLines: " + contentMarkdownLines);
         return contentMarkdownLines;
     }
 
     private ArrayList<String> generateVariableLines(ArrayList<String> variableNames) {
-        ArrayList<String> variableLines = new ArrayList<>(Arrays.asList("VARIABLES:", LONG_LINE));
+        ArrayList<String> variableLines = new ArrayList<>(Arrays.asList(LONG_LINE, "#VARIABLES():"));
         for (String variableName : variableNames) {
             variableLines.add(variableName + ": \"\"");
         }
+        variableLines.addAll(Arrays.asList("", "")); // Add two blank lines to the end of the "variables" entries
         return variableLines;
     }
 
     private ArrayList<String> generateSectionLines(ArrayList<String> sectionNames) {
-        ArrayList<String> sectionLines = new ArrayList<>(Arrays.asList("", "", "SECTIONS:"));
+        ArrayList<String> sectionLines = new ArrayList<>(Arrays.asList(LONG_LINE, "#SECTIONS():", ""));
         for (String sectionName : sectionNames) {
-            sectionLines.add(LONG_LINE);
-            sectionLines.add(sectionName + ":");
+            sectionLines.add("{" + sectionName + "}:");
             sectionLines.addAll(Arrays.asList("", "")); // Add two blank lines between sections
         }
         return sectionLines;
@@ -122,14 +113,19 @@ public class TemplateGenerationProcessor {
         System.out.println("TODO: Implement generateContentMarkdownLinesScripts");
     }
 
-    private TemplateElementList generateElementOrderList() {
+    private TemplateElementList generateElementOrderList(String validatedDirectory) {
         templateNameMap.clear();
         TemplateElementList templateElementList = new TemplateElementList();
-        for (TemplateExecutionOrder element : executionOrder) {
+        for (TemplateExecutionOrderItem element : executionOrder.items) {
             if (!templateNameMap.contains(element.elementType, element.elementName)) {
                 templateNameMap.add(element.elementType, element.elementName);
                 templateElementList.add(element.elementType, element.elementName);
             }
+        }
+        try {
+            jsonWriteToFile(Path.of(validatedDirectory, FilePathConstants.TEMPLATE_ELEMENT_FILE), templateNameMap);
+        } catch (IOException e) {
+            System.out.println("Unable to store templateNameMap: " + e + ", TODO: Add proper error handling");
         }
         return templateElementList;
     }
@@ -147,9 +143,7 @@ public class TemplateGenerationProcessor {
             Scanner userTextInput = new Scanner(System.in);
             try {
                 if (userTextInput.nextLine().equalsIgnoreCase("yes")) {
-                    Files.createDirectories(targetDirectoryPath);
-                    Files.createDirectories(Path.of(targetDirectory, CONFIG_DIRECTORY));
-                    System.out.println("Created directory " + targetDirectoryPath);
+                    ProjectCreator.createTemplateGeneratorDirectories(targetDirectoryPath);
                     validDirectory = true;
                 } else {
                     System.out.println("Enter a directory to save the template files: ");
@@ -176,7 +170,7 @@ public class TemplateGenerationProcessor {
     }
 
     private void writeExecutionOrderToFile(String validatedDirectory) {
-        Path executionOrderFile = Paths.get(validatedDirectory, EXECUTION_ORDER_MD);
+        Path executionOrderFile = Paths.get(validatedDirectory, FilePathConstants.EXECUTION_ORDER_FILE);
         try {
             jsonWriteToFile(executionOrderFile, executionOrder);
         } catch (IOException e) {
@@ -186,9 +180,9 @@ public class TemplateGenerationProcessor {
 
     private void writeContentMarkdownToFile(String validatedDirectory) {
         System.out.println("Generating content.md");
-        ArrayList<String> contentMarkdownLines = generateContentMarkdownLines();
+        ArrayList<String> contentMarkdownLines = generateContentMarkdownLines(validatedDirectory);
 
-        Path contentMarkdownFilePath = Paths.get(validatedDirectory, CONTENT_MD_FILE);
+        Path contentMarkdownFilePath = Paths.get(validatedDirectory, FilePathConstants.CONTENT_MD_FILE);
 
         try {
             writeStringArray(contentMarkdownFilePath.toString(), contentMarkdownLines);
@@ -198,9 +192,9 @@ public class TemplateGenerationProcessor {
     }
 
     private void writeConfigFiles(String validatedDirectory) {
-        Path configFile = Paths.get(validatedDirectory, CONFIG_DIRECTORY, CONFIG_FILE);
+        Path configFile = Paths.get(validatedDirectory, FilePathConstants.CONFIG_FILE);
         HashMap<String, ConfigObjectData> configMap = new HashMap<>();
-        configMap.put("default", new ConfigObjectData());
+        configMap.put(PageGenerationConstants.DEFAULT_CONFIG_NAME, new ConfigObjectData());
         try {
             jsonWriteToFilePrettyPrint(configFile, configMap);
         } catch (IOException e) {
@@ -208,13 +202,13 @@ public class TemplateGenerationProcessor {
             System.out.println("Enter \"yes\" to create \"config\" directory");
             Scanner userTextInput = new Scanner(System.in);
             if (userTextInput.nextLine().equalsIgnoreCase("yes")) {
-                Path configDirectoryPath = Path.of(validatedDirectory, CONFIG_DIRECTORY);
+                Path projectDirectory = Path.of(validatedDirectory);
                 try {
-                    Files.createDirectories(configDirectoryPath);
+                    ProjectCreator.createTemplateGeneratorDirectories(projectDirectory);
                     System.out.println("Created directory " + validatedDirectory);
                     jsonWriteToFilePrettyPrint(configFile, configMap);
                 } catch (IOException ex) {
-                    System.out.println("Failed to create config directory at: " + configDirectoryPath);
+                    System.out.println("Failed to create config directory at: " + projectDirectory);
                 }
             }
         }

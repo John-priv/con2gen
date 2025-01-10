@@ -1,19 +1,25 @@
 package objects;
 
-public class TemplateExecutionOrder {
-    public final String elementType;
-    public final String elementName;
-    public final Integer linesToSkip;
+import java.util.ArrayList;
 
-    public TemplateExecutionOrder(String inputExecutionType, String inputVariableName, Integer inputLineNumber) {
-        elementType = inputExecutionType;
-        elementName = inputVariableName;
-        linesToSkip = inputLineNumber;   // TODO: Should this be "number of lines to skip"?
+public class TemplateExecutionOrder {
+    public ArrayList<TemplateExecutionOrderItem> items;
+
+    public TemplateExecutionOrder() {
+        items = new ArrayList<>();
+    }
+
+    public void add(TemplateExecutionOrderItem templateExecutionOrderItem) {
+        items.add(templateExecutionOrderItem);
+    }
+
+    public void clear() {
+        items.clear();
     }
 
     public void print() {
-        System.out.println("Type: " + elementType +
-                ", Name: " + elementName +
-                ", Lines Skipped: " + linesToSkip);
+        for (TemplateExecutionOrderItem element : items) {
+            element.print();
+        }
     }
 }
