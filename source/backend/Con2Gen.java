@@ -2,11 +2,14 @@ package backend;
 
 import objects.TemplateNameMap;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Scanner;
 
 // TODO: Need to focus on just passing along mock data
 public class Con2Gen {
     private final Scanner userTextInput = new Scanner(System.in);
+    private final String sampleProjectPathString = "../sample-project-con2gen"; // TODO: Remove after prototype
 
     protected void runCon2Gen(){
         boolean runProgram = true;
@@ -19,7 +22,9 @@ public class Con2Gen {
             // prompt user for input
             System.out.println("/----------------------------------------------------------------/\n" +
                     "Select an option:\n" +
+                    "create-project: Create a new Con2Gen project\n" +
                     "template: Create a new template/update existing template\n" + // TODO: Should these options be separated?
+                    "update-template: Update an existing template\n" +
                     "page: Generate a single content page\n" +
                     "page-dir: Generate content pages for a directory\n" +
                     "exit: Exit\n" +
@@ -37,6 +42,10 @@ public class Con2Gen {
                 runProgram = false;
                 System.out.println("Ending execution");
                 break;
+            case "create-project":
+                System.out.println("Creating a new project");
+                createProject();
+                break;
             case "template":
                 System.out.println("Generating template (TODO: implement this)");
                 generateTemplates();
@@ -46,7 +55,8 @@ public class Con2Gen {
                 generateTemplates();
                 break;
             case "page":
-                System.out.println("Generating single page (TODO: implement this");
+                System.out.println("Generating single page (TODO: implement this)");
+                generatePage();
                 break;
             case "page-dir":
                 System.out.println("Generating directory of pages (TODO: implement this");
@@ -70,83 +80,48 @@ public class Con2Gen {
         // TODO: Make this configurable based on either user input OR a config file/input command
         // Add a CLI command that takes both the template file and output directory as inputs
         // I'd use the "userTextInput" approach but I'm too lazy to copy/paste two things per execution
-        String outputDirectory = "templates/test_template/";
+        String outputDirectory = sampleProjectPathString;
 
         TemplateGenerationProcessor templateGenerationProcessor = new TemplateGenerationProcessor();
         templateGenerationProcessor.generateNewTemplate(inputTemplateFile, outputDirectory);
     }
 
-    private void mockGenerateTemplate() {
-        System.out.println("Generating Mock Templates");
+    private void generatePage() {
+        // TODO: This should be able to be done via a project config file
+        System.out.println("Generating page from template");
+
+        System.out.println("Enter path to Con2Gen project"); // TODO: Organize this
+        String projectDirectory = sampleProjectPathString;
+
+        PageGenerator pageGenerator = new PageGenerator();
+
+        System.out.println("Enter path for a page to generate: ");
+//        String pageDirectory = userTextInput.nextLine(); // Test page: "../sample-project-con2gen/pages/test_page"
+        String pageDirectory = "../sample-project-con2gen/pages/test_page"; // TODO: Make this based on user input
+
+        // TODO: Make this based on user input/config file/extracting page name from pageDirectory
+        String outputDirectory = Path.of(projectDirectory, "/generated_pages/test_page").toString();
+
+        pageGenerator.generatePage(projectDirectory, pageDirectory, outputDirectory);
     }
 
-    // Add functions for each of the above steps of the code. These can be refactored to separate files later on
+    private void createProject() {
+        System.out.println("Enter path for new project: ");
+        String userSelection = userTextInput.nextLine();
+        Path projectPath = Path.of(userSelection);
+        System.out.println("Create new project at \"" + projectPath + "\"? Enter \"yes\" to confirm");
+            if (userTextInput.nextLine().equalsIgnoreCase("yes")) {
+                System.out.println("Creating project");
+                ProjectCreator projectCreator = new ProjectCreator(projectPath);
+                try {
+                    projectCreator.createProject();
+                } catch (IOException e) {
+                    System.out.println("Failed to create project at " + projectPath + "due to: " + e);
+                }
+            }
+    }
 
 }
-
-//// General states: TODO: move these to relevant spots
-
-//        // Select file to make into a template
-//        importFile();
-//
-//        // Generate templates
-//        generateTemplates();
-//
-//        // Content.md creation logic
-//        System.out.println("Creating/updating 'Content.md'");
-//
-//        // Variables.json creation logic
-//        // TODO: Figure out format for Variables file, as it may not be json/markdown
-//        System.out.println("Creating/updating 'Variables.json'");
-//
-//        // Generate section files from Content.md
-//        System.out.println("Generating section files from `Content.md`");
-//
-//        // Clone marked up page for processing
-//        System.out.println("Cloning marked up page");
-//
-//        // Process section files into the marked up page format
-//        System.out.println("Processing and adding section content data to output file");
-//
-//        // Save/rename/move/finish processing output file
-//        System.out.println("Completing processing for content file");
-
-
-/*
-    Notes for "Nesting"
-    TODO: verify that the formats of "#SECTION.", "#VARIABLE.", "#SCRIPT.", and "#IMAGE." aren't used by major tools
-    TODO: Add ability to have optional WRAPPED sections
-       These "optional wrapped sections" should only generate if there is content for them
-        Ex: If no nutrition info is provided, no nutrition info section should be added
-        Ex2: A section for "More Images" should only generate if there are more images
-            Any HTML/CSS related to it should not appear if there's no content
-            Title "More Images", the image files, and any border/grid should only be created if there's content
-            If the "More Images" content file is blank, don't generate ANY adjacent web code
-        This can probably be done via a new flag + brackets
-        Sections that aren't optional don't need this extra overhead
-    Question: Should ALL sections be bracketed?
-        That would make things consistent, but it feels unneeded in a lot of cases
-            It seems better if EVERY section behaves like an optional section
-        Adding ANY bracketed sections would make nesting a potential problem
-            If I have to deal with nesting at all, it might be worth just actually dealing with it
-            Option 1: Make ANY nesting fail
-                I think this is a good option at first
-            Option 2: Allow ALL nesting
-                Generate any portions that are nested even if the things above them are not
-            Option 3: Allow nesting ONLY when all layers are complete
-                If every section in a nest has content, then generate the full nest
-    Solution:
-        All three options can eventually be supported through configurations
-        For the first approach, no nested brackets will be supported
-            Other cases can be added later on if the need arises
-
-   Section formatting should be done outside of the template page
-       In the template page, sections/variables/etc should be simple
-           Any additional formatting should be done elsewhere
-           If a section requires <ol> and <li>, they should be set in separate file
-*/
-
-
 
 /*
     Future Ideas:
