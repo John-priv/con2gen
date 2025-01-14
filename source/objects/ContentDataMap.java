@@ -14,17 +14,42 @@ public class ContentDataMap {
     }
 
     // TODO: Do data processing AFTER the initial add (this is more of a note for PageGenerator)
-    public void add(String elementType, String elementName, ArrayList<String> elementValue) {
+    public void add(String elementType, String elementName, String elementValue) {
         if (!dataItemMap.containsKey(elementType)) {
             System.out.println("Invalid element type passed into ContentDataMap: " + elementType);
             return;
         }
 
         if (dataItemMap.get(elementType).containsKey(elementName)) {
-            dataItemMap.get(elementType).get(elementName).update(elementValue);
+            dataItemMap.get(elementType).get(elementName).append(elementValue);
         }
         else {
             dataItemMap.get(elementType).put(elementName, new ContentDataMapItem(elementValue));
+        }
+    }
+
+    public void setValue(String elementType, String elementName, String elementValue) {
+        if (!dataItemMap.containsKey(elementType)) {
+            System.out.println("Invalid element type passed into ContentDataMap: " + elementType);
+            return;
+        }
+
+        if (dataItemMap.get(elementType).containsKey(elementName)) {
+            dataItemMap.get(elementType).get(elementName).setValue(elementValue);
+        }
+        else {
+            dataItemMap.get(elementType).put(elementName, new ContentDataMapItem(elementValue));
+        }
+    }
+
+    public void remove(String elementType, String elementName) {
+        if (!dataItemMap.containsKey(elementType)) {
+            System.out.println("Invalid element type passed into ContentDataMap: " + elementType);
+            return;
+        }
+
+        if (dataItemMap.get(elementType).containsKey(elementName)) {
+            dataItemMap.get(elementType).get(elementName).clear();
         }
     }
 
@@ -44,9 +69,46 @@ public class ContentDataMap {
 
     }
 
-    // TODO: Implement this class
-    // This class should have something like the following format:
-    //      contentDataMap[element_type][element_name] = "text data for a section/variable"
-    //      or
-    //      contentDataMap[element_type][element_name].data = "text data for a section/variable"
+    public HashMap<String, ContentDataMapItem> getElementType(String elementType) {
+        if (!containsElementType(elementType)) {
+            System.out.println("Invalid elementType: \"" + elementType + "\" is not in ContentDataMap");
+            return null;
+        }
+        return dataItemMap.get(elementType);
+    }
+
+    public boolean containsKey(String elementType, String elementName) {
+        if (!dataItemMap.containsKey(elementType)) {
+            return false;
+        }
+        return dataItemMap.get(elementType).containsKey(elementName);
+    }
+
+    public boolean containsElementType(String elementType) {
+        return dataItemMap.containsKey(elementType);
+    }
+
+    public void print() {
+        for (String eType : dataItemMap.keySet()) {
+            for (String eName : dataItemMap.get(eType).keySet()) {
+                System.out.println(eType + "." + eName + ": " + dataItemMap.get(eType).get(eName).data);
+            }
+        }
+    }
+
+    public void printPartial(int maxSize) {
+        if (maxSize < 1) {
+            maxSize = 1;
+        }
+        for (String eType : dataItemMap.keySet()) {
+            for (String eName : dataItemMap.get(eType).keySet()) {
+                if (dataItemMap.get(eType).get(eName).data.size() > maxSize) {
+                    System.out.println(eType + "." + eName + ": " + dataItemMap.get(eType).get(eName).data.subList(0, maxSize));
+                }
+                else {
+                    System.out.println(eType + "." + eName + ": " + dataItemMap.get(eType).get(eName).data);
+                }
+            }
+        }
+    }
 }
