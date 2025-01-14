@@ -12,7 +12,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -36,8 +35,6 @@ public class TemplateGenerationProcessor {
     public TemplateNameMap templateNameMap = new TemplateNameMap();
     private TemplateExecutionOrder executionOrder = new TemplateExecutionOrder();
     Pattern templatePattern = getTemplateRegex();
-
-    private static final String LONG_LINE = "--------------------------------------------------";
 
     public TemplateGenerationProcessor() {
     }
@@ -88,7 +85,8 @@ public class TemplateGenerationProcessor {
     }
 
     private ArrayList<String> generateVariableLines(ArrayList<String> variableNames) {
-        ArrayList<String> variableLines = new ArrayList<>(Arrays.asList(LONG_LINE, "#VARIABLES():"));
+        ArrayList<String> variableLines = new ArrayList<>(Arrays.asList(PageGenerationConstants.LONG_LINE,
+                "{{VARIABLES}}:", PageGenerationConstants.LONG_LINE));
         for (String variableName : variableNames) {
             variableLines.add(variableName + ": \"\"");
         }
@@ -97,7 +95,8 @@ public class TemplateGenerationProcessor {
     }
 
     private ArrayList<String> generateSectionLines(ArrayList<String> sectionNames) {
-        ArrayList<String> sectionLines = new ArrayList<>(Arrays.asList(LONG_LINE, "#SECTIONS():", ""));
+        ArrayList<String> sectionLines = new ArrayList<>(Arrays.asList(PageGenerationConstants.LONG_LINE,
+                "{{SECTIONS}}:", PageGenerationConstants.LONG_LINE));
         for (String sectionName : sectionNames) {
             sectionLines.add("{" + sectionName + "}:");
             sectionLines.addAll(Arrays.asList("", "")); // Add two blank lines between sections
@@ -192,21 +191,20 @@ public class TemplateGenerationProcessor {
     }
 
     private void writeConfigFiles(String validatedDirectory) {
-        Path configFile = Paths.get(validatedDirectory, FilePathConstants.CONFIG_FILE);
-        HashMap<String, ConfigObjectData> configMap = new HashMap<>();
-        configMap.put(PageGenerationConstants.DEFAULT_CONFIG_NAME, new ConfigObjectData());
+        Path configFile = Paths.get(validatedDirectory, FilePathConstants.FORMATTING_FILE);
+        CssFormattingMap cssFormattingMap = new CssFormattingMap();
         try {
-            jsonWriteToFilePrettyPrint(configFile, configMap);
+            jsonWriteToFilePrettyPrint(configFile, cssFormattingMap);
         } catch (IOException e) {
             System.out.println("Error in writeConfigFiles: " + e);
-            System.out.println("Enter \"yes\" to create \"config\" directory");
+            System.out.println("Enter \"yes\" to create \"" + FilePathConstants.CONFIG_DIRECTORY + "\" directory");
             Scanner userTextInput = new Scanner(System.in);
             if (userTextInput.nextLine().equalsIgnoreCase("yes")) {
                 Path projectDirectory = Path.of(validatedDirectory);
                 try {
                     ProjectCreator.createTemplateGeneratorDirectories(projectDirectory);
                     System.out.println("Created directory " + validatedDirectory);
-                    jsonWriteToFilePrettyPrint(configFile, configMap);
+                    jsonWriteToFilePrettyPrint(configFile, cssFormattingMap);
                 } catch (IOException ex) {
                     System.out.println("Failed to create config directory at: " + projectDirectory);
                 }
