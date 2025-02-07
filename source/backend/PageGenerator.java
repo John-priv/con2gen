@@ -2,6 +2,7 @@ package backend;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import constants.FilePathConstants;
+import constants.PageGenerationConstants;
 import constants.RegexPatterns;
 import objects.*;
 
@@ -125,8 +126,9 @@ public class PageGenerator {
     }
 
     private ContentDataMap getContentDataMap(Path contentMDPath, TemplateNameMap contentElementNameMap) throws IOException {
+        // TODO: Refactor this into separate functions where possible --> Do this during unit testing stage
+        //       It's not worth refactoring this without unit tests, as it currently works
         ContentDataMap contentDataMap = new ContentDataMap();
-        // TODO: Change elementType processing from the current approach to {{ELEMENT_TYPE}}
 
         File contentMDFile = contentMDPath.toFile();
         Scanner contentMDFileReader = new Scanner(contentMDFile);
@@ -225,6 +227,7 @@ public class PageGenerator {
     }
 
     private void processSections(ContentDataMap contentDataMap, CssFormattingMap cssFormattingMap) {
+        CssFormattingItem defaultSectionFormatting = cssFormattingMap.get(PageGenerationConstants.DEFAULT_CONFIG_NAME);
         // TODO: Refactor this
         // NOTE: Multi-line items need special processing (code blocks, paragraphs)
         if (!contentDataMap.containsElementType(TemplateElementTypes.SECTION)) {
@@ -232,8 +235,21 @@ public class PageGenerator {
             return;
         }
         for (String sectionName : contentDataMap.getElementType(TemplateElementTypes.SECTION).keySet()) {
-            updateSectionInLine(contentDataMap, contentDataMap.getData(TemplateElementTypes.SECTION, sectionName), cssFormattingMap);
-            updateSectionMultiLine(contentDataMap, contentDataMap.getData(TemplateElementTypes.SECTION, sectionName), cssFormattingMap);
+
+            CssFormattingItem sectionFormatting = cssFormattingMap.getAndReplaceEmpty(sectionName, defaultSectionFormatting);
+            if (sectionFormatting == null) {
+                // TODO: Move this --> this should be set somewhere BEFORE this stage
+                sectionFormatting = cssFormattingMap.get(PageGenerationConstants.DEFAULT_CONFIG_NAME);
+            }
+
+            // TODO: Remove this printing, importing sections with a default value seems to work
+            System.out.println("Section: " + sectionName);
+//            sectionFormatting.print();
+
+            updateSectionInLine(contentDataMap, contentDataMap.getData(TemplateElementTypes.SECTION, sectionName), sectionFormatting);
+            updateSectionMultiLine(contentDataMap, contentDataMap.getData(TemplateElementTypes.SECTION, sectionName), sectionFormatting);
+
+            System.out.println(contentDataMap.getData(TemplateElementTypes.SECTION, sectionName));
 
             // TODO: Add separate checks for in-line formatting vs multi-line formatting
             // Ex: Italics and headings are in-line, code blocks and paragraphs are multi-line
@@ -241,22 +257,28 @@ public class PageGenerator {
         }
     }
 
-    private void updateSectionInLine(ContentDataMap contentDataMap, ArrayList<String> sectionData, CssFormattingMap cssFormattingMap) {
+    private void updateSectionInLine(ContentDataMap contentDataMap, ArrayList<String> sectionData, CssFormattingItem sectionFormatting) {
         // TODO: Refactor this
         // Should there be a processing class JUST for this?
         // A regex processing class might be useful
 
         // NOTE: Bold/Italic/Strong text share a regex
         // TODO: Investigate if the "bold" or "strong" HTML tags should be used
+        if (sectionData.isEmpty()) {
+            return;
+        }
 
-        for (String line : sectionData) {
-            if (checkForHeader(line)) {
-                System.out.println("Look for header regex in line: \"" + line + "\"");
-            }
+        for (int i = 0; i < sectionData.size(); i++) {
+            String line = sectionData.get(i);
 
-            if (checkForItalicsOrBold(line)) {
-                System.out.println("Look for italic/bold regex");
-            }
+            line = checkForHeading(line, sectionFormatting);
+            line = checkForItalicsOrBold(line, sectionFormatting);
+            line = checkForUnorderedList(line, sectionFormatting);
+
+//             TODO: Investigate if this needs to be multi-line
+//            line = checkForOrderedList(line, sectionFormatting); // TODO: Implement this
+
+            sectionData.set(i, line);
         }
 
         // Process:
@@ -268,19 +290,172 @@ public class PageGenerator {
 
     }
 
-    private void updateSectionMultiLine(ContentDataMap contentDataMap, ArrayList<String> sectionData, CssFormattingMap cssFormattingMap) {
+    // TODO con2gen-20: Implement support for multi-line regex
+    private void updateSectionMultiLine(ContentDataMap contentDataMap, ArrayList<String> sectionData, CssFormattingItem sectionFormatting) {
         // Look for multi-line formatting, such as code blocks and paragraphs
         // Need to mark start and end of lines that may contain multi-line formatting
         // NOTE: Code blocks can be in-line OR multi-line --> need to check in-line AND multi-line
         //          This means that code blocks may be in-line/in-line multiple times
     }
 
-    private boolean checkForHeader(String line) {
+    private boolean containsPotentialHeader(String line) {
         return line.contains("#");
     }
 
-    private boolean checkForItalicsOrBold(String line) {
+    private boolean containsPotentialItalicOrBold(String line) {
         return line.contains("*");
+    }
+
+    private boolean containsPotentialUnorderedList(String line) {
+        return line.contains("- ");
+    }
+
+    private boolean containsPotentialOrderedList(String line) {
+        return line.contains("- ") || line.contains(". ");
+    }
+
+    private String checkForHeading(String line, CssFormattingItem sectionFormatting) {
+        // TODO: Need to import settings for header
+        if (!containsPotentialHeader(line)) {
+            return line;
+        }
+
+        System.out.println("Look for header regex in line: \"" + line + "\"");  // TODO: remove print
+        Matcher matcher = RegexPatterns.headerPattern.matcher(line);
+        if (matcher.find()) {
+            int headingLevel = matcher.group(1).length();
+
+            // Add a ceiling of 6 to headingLevel, as <h6> is the highest header value
+            if (headingLevel > 6) {
+                headingLevel = 6;
+            }
+
+            String headingPrefix = getHeadingPrefix(headingLevel, sectionFormatting);
+            String headingSuffix = getHeadingSuffix(headingLevel);
+            String headerText = headingPrefix + matcher.group(2) + headingSuffix;
+            line = line.replaceFirst(matcher.group(0), headerText);
+        }
+        return line;
+    }
+
+    private String getHeadingPrefix(int headingLevel, CssFormattingItem sectionFormatting) {
+        if (headingLevel < 1 || headingLevel > 6) {
+            headingLevel = 6;
+        }
+        String headingElementType = "h" + headingLevel;
+        String headingFormatting = sectionFormatting.getHeadingFormatting(headingLevel);
+        return getHtmlElementPrefix(headingElementType, headingFormatting);
+    }
+
+    private String getHeadingSuffix(int headingLevel) {
+        if (headingLevel < 1 || headingLevel > 6) {
+            headingLevel = 6;
+        }
+        return getHtmlElementSuffix("h" + headingLevel);
+    }
+
+    private String getHtmlElementPrefix(String htmlElementType, String htmlElementFormatting) {
+        if (htmlElementFormatting == null || htmlElementFormatting.isBlank()) {
+            return "<" + htmlElementType + ">";
+        }
+        return "<" + htmlElementType + " class=\"" + htmlElementFormatting + "\">";
+    }
+
+    private String getHtmlElementSuffix(String htmlElementType) {
+        return "<\\" + htmlElementType + ">";
+    }
+
+    private String checkForItalicsOrBold(String line, CssFormattingItem sectionFormatting) {
+        if (!containsPotentialItalicOrBold(line)) {
+            return line;
+        }
+
+        System.out.println("Look for italics or regex in line: \"" + line + "\""); // TODO: remove print
+        Matcher matcher = RegexPatterns.italicOrBoldPattern.matcher(line);
+        while (matcher.find()) {
+            Integer emphasisLevel = Math.min(matcher.group(1).length(), matcher.group(3).length());
+            String emphasisPrefix = getEmphasisPrefix(emphasisLevel, sectionFormatting);
+            String emphasisSuffix = getEmphasisSuffix(emphasisLevel);
+
+            String emphasisText = emphasisPrefix + matcher.group(2) + emphasisSuffix;
+            line = line.replace(matcher.group(0), emphasisText);
+        }
+
+        return line;
+    }
+
+    private String getEmphasisPrefix(Integer emphasisLevel, CssFormattingItem sectionFormatting) {
+        if (emphasisLevel == null || emphasisLevel < 1) {
+            return "";
+        }
+
+        return switch (emphasisLevel) {
+            case PageGenerationConstants.ITALICS -> getItalicsPrefix(sectionFormatting);
+            case PageGenerationConstants.BOLD -> getBoldPrefix(sectionFormatting);
+            default -> getItalicsAndBoldPrefix(sectionFormatting);
+        };
+    }
+
+    private String getEmphasisSuffix(Integer emphasisLevel) {
+        if (emphasisLevel == null || emphasisLevel < 1) {
+            return "";
+        }
+
+        return switch (emphasisLevel) {
+            case PageGenerationConstants.ITALICS -> getItalicsSuffix();
+            case PageGenerationConstants.BOLD -> getBoldSuffix();
+            default -> getItalicsAndBoldSuffix();
+        };
+    }
+
+    private String getItalicsPrefix(CssFormattingItem sectionFormatting) {
+        if (sectionFormatting.italics == null || sectionFormatting.italics.isBlank()) {
+            return "<em>";
+        }
+        return "<em class=\"" + sectionFormatting.italics + "\">";
+    }
+
+    private String getItalicsSuffix() {
+        return "</em>";
+    }
+
+    private String getBoldPrefix(CssFormattingItem sectionFormatting) {
+        if (sectionFormatting.bold == null || sectionFormatting.bold.isBlank()) {
+            return "<strong>";
+        }
+        return "<strong class=\"" + sectionFormatting.bold + "\">";
+    }
+
+    private String getBoldSuffix() {
+        return "</strong>";
+    }
+
+    private String getItalicsAndBoldPrefix(CssFormattingItem sectionFormatting) {
+        return getBoldPrefix(sectionFormatting) + getItalicsPrefix(sectionFormatting);
+    }
+
+    private String getItalicsAndBoldSuffix() {
+        return getItalicsSuffix() + getBoldSuffix();
+    }
+
+    private String checkForUnorderedList(String line, CssFormattingItem sectionFormatting) {
+        // TODO: Refine "containsPotentialList()" to support any of the approved formats: "- ", "1. " or "-- "
+        if (!containsPotentialUnorderedList(line)) {
+            return line;
+        }
+
+        // TODO: Apply this for unordered lists
+        System.out.println("Look for italics or regex in line: \"" + line + "\""); // TODO: remove print
+//        Matcher matcher = RegexPatterns.unorderedListPattern.matcher(line);
+//        while (matcher.find()) {
+//            Integer emphasisLevel = Math.min(matcher.group(1).length(), matcher.group(3).length());
+//            String emphasisPrefix = getEmphasisPrefix(emphasisLevel, sectionFormatting);
+//
+//            String emphasisText = emphasisPrefix + matcher.group(2);
+//            line = line.replace(matcher.group(0), emphasisText);
+//        }
+
+        return line + "TODO: Add unordered list support";
     }
 
     // TODO: Figure out if there's a non-ugly way to implement this
